@@ -1,0 +1,23 @@
+Nap is multi protocol CLI REST (REpresentational State Transfer)
+Client, named "nap" because it is the best kind of rest *ba dum tss*.
+
+Program reads standard input and sends it to server exactly as it
+(with small exception in Gopher, see examples below).  The complete
+lack of extra abstractions and logic between what you send and what
+server receive was the goal of this project along with support for
+multiple protocols.
+
+Supported protocols:
+
+	name    version   ssl
+	------  --------  ---
+	gopher
+	http    HTTP/1.0
+	https   HTTP/1.0  yes
+	gemini            yes
+
+Build and usage:
+
+	$ ./build
+	$ ./nap <file
+

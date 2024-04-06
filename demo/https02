@@ -1,0 +1,2 @@
+GET https://jsonplaceholder.typicode.com/todos/1 HTTP/1.0
+Host: jsonplaceholder.typicode.com
