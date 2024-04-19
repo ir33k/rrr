@@ -1,4 +1,4 @@
-#define VERSION "v1.0"
+#define VERSION "v1.1"
 
 #include <err.h>
 #include <getopt.h>
@@ -41,7 +41,7 @@ main(int argc, char **argv)
 		}
 	}
 	if (argc - optind < 2) {
-		fprintf(stderr, "ERROR: Missing required arguments");
+		warnx("Missing required arguments");
 		usage(argv[0]);
 		return 1;
 	}
