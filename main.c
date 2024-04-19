@@ -47,10 +47,10 @@ main(int argc, char **argv)
 	}
 	i = rrr_req(stdin, argv[optind], atoi(argv[optind+1]), ssl);
 	if (i >= RRR_ERRNO) {
-		err(1,  rrr_err(i));
+		err(1, "%s", rrr_err(i));
 	}
 	if (i) {
-		errx(1, rrr_err(i));
+		errx(1, "%s", rrr_err(i));
 	}
 	return 0;
 }

@@ -29,10 +29,10 @@ enum rrr {
 };
 
 // Send FP content as request to HOST on PORT, use SSL if SECURE.
-// Return 0 on success.
+// Return 0 on success, error code on failure.
 enum rrr rrr_req(FILE *fp, char *host, int port, int secure);
 
-// Retrive string message for given ERR error code.
-char *rrr_err(enum rrr err);
+// Retrive string message for given error CODE.
+char *rrr_err(enum rrr code);
 
 #endif // _RRR_H

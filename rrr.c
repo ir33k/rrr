@@ -11,7 +11,7 @@
 #define CRLF "\r\n"
 
 // Establish internet TCP socket stream connection to HOST on PORT.
-// Return socket file descriptor.
+// When 0 is returned then SFD was set and connected successfully.
 static enum rrr
 tcp(char *host, int port, int *sfd)
 {
@@ -33,28 +33,16 @@ tcp(char *host, int port, int *sfd)
 		if (connect(*sfd, (struct sockaddr*)&addr, sizeof(addr))) {
 			continue;
 		}
-		return 0;
+		return 0;	// Success
 	}
 	return RRR_CONNECT;
 }
 
-// Write RES response bytes of SZ size to standard output.
-static enum rrr
-onres(char *res, size_t sz)
-{
-	assert(res);
-	if (fwrite(res, 1, sz, stdout) != sz) {
-		return RRR_PRINT;
-	}
-	return 0;
-}
-
 // Request content of FP to open SFD socket.
-// Call onres() on each server response message.
+// Write response to stdout.
 static enum rrr
 req_plain(int sfd, FILE *fp)
 {
-	enum rrr err;
 	char buf[4096];
 	size_t sz;
 	assert(sfd);
@@ -68,19 +56,18 @@ req_plain(int sfd, FILE *fp)
 		return RRR_REQ_CRLF;
 	}
 	while ((sz = recv(sfd, buf, sizeof(buf), 0)) > 0) {
-		if ((err = onres(buf, sz))) {
-			return err;
+		if (fwrite(buf, 1, sz, stdout) != sz) {
+			return RRR_PRINT;
 		}
 	}
 	return 0;
 }
 
 // Request secure content of FP to open SFD socket to HOST.
-// Call onres() on each server response message.
+// Write response to stdout.
 static enum rrr
 req_secure(int sfd, FILE *fp, char *host)
 {
-	enum rrr err;
 	char buf[4096];
 	size_t sz;
 	SSL *ssl;
@@ -112,8 +99,8 @@ req_secure(int sfd, FILE *fp, char *host)
 		return RRR_SSL_CRLF;
 	}
 	while ((sz = SSL_read(ssl, buf, sizeof(buf))) > 0) {
-		if ((err = onres(buf, sz))) {
-			return err;
+		if (fwrite(buf, 1, sz, stdout) != sz) {
+			return RRR_PRINT;
 		}
 	}
 	SSL_CTX_free(ctx);
@@ -124,21 +111,21 @@ req_secure(int sfd, FILE *fp, char *host)
 enum rrr
 rrr_req(FILE *fp, char *host, int port, int secure)
 {
-	enum rrr err;
+	enum rrr code;
 	int sfd;
 	if (!port) {
 		return RRR_PORT;
 	}
-	if ((err = tcp(host, port, &sfd))) {
-		return err;
+	if ((code = tcp(host, port, &sfd))) {
+		return code;
 	}
 	if (secure) {
-		if ((err = req_secure(sfd, fp, host))) {
-			return err;
+		if ((code = req_secure(sfd, fp, host))) {
+			return code;
 		}
 	} else {
-		if ((err = req_plain(sfd, fp))) {
-			return err;
+		if ((code = req_plain(sfd, fp))) {
+			return code;
 		}
 	}
 	if (close(sfd)) {
@@ -148,9 +135,9 @@ rrr_req(FILE *fp, char *host, int port, int secure)
 }
 
 char *
-rrr_err(enum rrr err)
+rrr_err(enum rrr code)
 {
-	switch (err) {
+	switch (code) {
 	case RRR_OK:          return "Ok";
 	case RRR_PORT:        return "Missing port";
 	case RRR_HOST:        return "Failed to get hostname";
