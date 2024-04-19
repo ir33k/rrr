@@ -1,2 +1,0 @@
-GET https://www.wikipedia.org/ HTTP/1.0
-Host: wikipedia.org

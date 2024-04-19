@@ -1,59 +1,56 @@
-#include "nap.h"
-#include "uri.h"
-#include <assert.h>
-#include <err.h>
-#include <stdio.h>
-#include <string.h>
+#define VERSION "v1.0"
 
-// Allocate FP file stream as string to OUT, return string length.
-static size_t
-falloc(FILE *fp, char **out)
+#include <err.h>
+#include <getopt.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include "rrr.h"
+
+static void
+usage(char *arg0)
 {
-	const size_t chunk = 4096;
-	size_t sz, len = 0;
-	assert(fp);
-	assert(out);
-	if (!(*out = malloc(chunk))) {
-		err(1, "Failed to allocate %lu", chunk);
-	}
-	while ((sz = fread(*out + len, 1, chunk - 1, fp))) {
-		len += sz;
-		if (sz == chunk - 1 && !(*out = realloc(*out, len + chunk))) {
-			err(1, "Failed to reallocate %lu", len + chunk);
-		}
-	}
-	memcpy(*out + len, "\0", 1);	// Null terminate
-	return len;
+	printf("usage: %s [-h] [-v] [-s] host port <req\n"
+	       "\n"
+	       "	host	Target server hostname.\n"
+	       "	port	Target server port.\n"
+	       "	req	Request message from stdin.\n"
+	       "	-h	Print this help message.\n"
+	       "	-v	Print program version.\n"
+	       "	-s	Use SSL secure connection.\n"
+	       , arg0);
 }
 
 int
-main(void)
+main(int argc, char **argv)
 {
-	int error, protocol, port, secure=0;
-	size_t len;
-	char *str, *host;
-	len = falloc(stdin, &str);
-	protocol = uri_protocol(str);
-	if (!(host = uri_host(str))) errx(1, "Missing host");
-	if (!(port = uri_port(str))) port = protocol;
-	switch (protocol) {
-	case GOPHER:
-		if (!(str = uri_path(str))) str = "";
-		len = strlen(str);
-		break;
-	case HTTPS:
-	case GEMINI:
-		secure = 1;
+	int i, ssl=0;
+	while ((i = getopt(argc, argv, "hvs")) != -1) {
+		switch (i) {
+		case 'h':
+			usage(argv[0]);
+			return 0;
+		case 'v':
+			puts(VERSION);
+			return 0;
+		case 's':
+			ssl = 1;
+			break;
+		default:
+			usage(argv[0]);
+			return 1;
+		}
 	}
-	error = nap_req(str, len, host, port, secure);
-	if (error >= NAP_OPENSSL) {
-		errx(1, "ERROR SSL: %s", nap_err(error));
+	if (argc - optind < 2) {
+		fprintf(stderr, "ERROR: Missing required arguments");
+		usage(argv[0]);
+		return 1;
 	}
-	if (error >= NAP_ERRNO) {
-		err(1, "ERROR: %s", nap_err(error));
+	i = rrr_req(stdin, argv[optind], atoi(argv[optind+1]), ssl);
+	if (i >= RRR_ERRNO) {
+		err(1,  rrr_err(i));
 	}
-	if (error) {
-		errx(1, "ERROR: %s", nap_err(error));
+	if (i) {
+		errx(1, rrr_err(i));
 	}
 	return 0;
 }

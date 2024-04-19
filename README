@@ -1,23 +1,52 @@
-Nap is multi protocol CLI REST (REpresentational State Transfer)
-Client, named "nap" because it is the best kind of rest *ba dum tss*.
-
-Program reads standard input and sends it to server exactly as it
-(with small exception in Gopher, see examples below).  The complete
-lack of extra abstractions and logic between what you send and what
-server receive was the goal of this project along with support for
-multiple protocols.
-
-Supported protocols:
-
-	name    version   ssl
-	------  --------  ---
-	gopher
-	http    HTTP/1.0
-	https   HTTP/1.0  yes
-	gemini            yes
+RRR (Raw Request Response) program sends raw unprocessed request from
+standard input to server under host on given port and prints out raw
+unprocessed server response to standard output.
 
 Build and usage:
 
 	$ ./build
-	$ ./nap <file
+	$ ./rrr -h
+	$ ./rrr    host port <file	# Regular request
+	$ ./rrr -s host port <file	# SSL request
 
+Request root of Gopher hole:
+
+	$ echo "" | ./rrr tilde.pink 70
+	$ echo "" | ./rrr gopher.floodgap.com 70
+
+Request path of Gopher hole:
+
+	$ echo "/~irek" | ./rrr tilde.pink 70
+	$ echo "/fun"   | ./rrr gopher.floodgap.com 70
+
+Request file from Gopher hole:
+
+	$ echo "/~irek/log/README"   | ./rrr tilde.pink 70
+	$ echo "/~irek/log/20240416" | ./rrr tilde.pink 70
+	$ echo "/~irek/log/20231119" | ./rrr tilde.pink 70
+
+Request search result from Gopher hole:
+
+	$ echo "/v2/vs	vim"    | ./rrr gopher.floodgap.com 70
+	$ echo "/v2/vs	emacs"  | ./rrr gopher.floodgap.com 70
+	$ echo "/v2/vs	gemini" | ./rrr gopher.floodgap.com 70
+
+Request HTTP page:
+
+	$ echo "GET http://gabr.pl/ HTTP/1.0"      | ./rrr irek.gabr.pl 80
+	$ echo "GET http://arek.gabr.pl/ HTTP/1.0" | ./rrr irek.gabr.pl 80
+	$ echo "GET http://irek.gabr.pl/ HTTP/1.0" | ./rrr irek.gabr.pl 80
+
+Request HTTPS page:
+
+	$ echo "GET / HTTP/1.0
+	  Host: www.wikipedia.org" | ./rrr -s wikipedia.org 443
+	$ echo "GET / HTTP/1.0
+	  Host: www.google.com" | ./rrr -s google.com 443
+	$ echo "GET /todos/1 HTTP/1.0
+	  Host: jsonplaceholder.typicode.com" | ./rrr -s jsonplaceholder.typicode.com 443
+
+Request Gemini capsule:
+
+	$ echo "gemini://tilde.pink/"       | ./rrr -s tilde.pink 1965
+	$ echo "gemini://tilde.pink/~irek/" | ./rrr -s tilde.pink 1965
