@@ -1,13 +1,16 @@
-#define VERSION "v1.1"
+#define VERSION "v2.0"
 
 #include <assert.h>
 #include <err.h>
 #include <getopt.h>
+#include <netdb.h>
+#include <openssl/ssl.h>
 #include <stdio.h>
-#include <stdlib.h>
-#include "rrr.h"
+#include <string.h>
+#include <unistd.h>
 
-// Print usage help message to stdout for ARG0 program name.
+#define CRLF "\r\n"
+
 static void
 usage(char *arg0)
 {
@@ -22,43 +25,113 @@ usage(char *arg0)
 	       , arg0);
 }
 
-// If error CODE is non 0 then print error message and exit with 1.
-static void
-maybe(int code)
+// Establish internet TCP socket stream connection to HOST on PORT.
+// Return Socker File Descriptor on success, exit with 1 on error.
+static int
+tcp(char *host, int port)
 {
-	if (!code) {
-		return;
-	}
-	if (code >= RRR_NO) {
-		err(1, "%s", rrr_err(code));
-	}
-	if (code >= RRR_SSL) {
-		errx(1, "OpenSSL: %s", rrr_err(code));
-	}
-	errx(1, "%s", rrr_err(code));
-}
-
-// Open connection to HOST with PORT, secure if SSL, read request
-// message from stdin and write server response to stdout.
-static void
-run(char *host, int port, int ssl)
-{
-	struct rrr ctx;
-	char buf[4096];
-	size_t sz;
+	int i, sfd;
+	struct hostent *he;
+	struct sockaddr_in addr;
 	assert(host);
 	assert(port > 0);
-	maybe(rrr_open(&ctx, host, port, ssl));
-	while ((sz = fread(buf, 1, sizeof(buf), stdin))) {
-		maybe(rrr_req(&ctx, buf, sz));
+	if ((sfd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)) < 0) {
+		err(1, "Failed to open socker");
 	}
-	maybe(rrr_req(&ctx, "\r\n", 2));
-	while ((sz = rrr_res(&ctx, buf, sizeof(buf)))) {
+	if ((he = gethostbyname(host)) == 0) {
+		errx(1, "Failed to get hostname");
+	}
+	addr.sin_family = AF_INET;
+	addr.sin_port = htons(port);
+	for (i=0; he->h_addr_list[i]; i++) {
+		memcpy(&addr.sin_addr.s_addr, he->h_addr_list[i], sizeof(in_addr_t));
+		if (connect(sfd, (struct sockaddr*)&addr, sizeof(addr))) {
+			continue;
+		}
+		return sfd;	// Success
+	}
+	errx(1, "Failed to connect (invalid port?)");
+}
+
+// Non secure plain request for open SFD.
+static void
+plain(int sfd)
+{
+	char buf[4096];
+	size_t sz;
+	assert(sfd);
+	while ((sz = fread(buf, 1, sizeof(buf), stdin))) {
+		if (send(sfd, buf, sz, 0) == -1) {
+			err(1, "Failed to send request to server");
+		}
+	}
+	if (send(sfd, CRLF, sizeof(CRLF), 0) == -1) {
+		err(1, "Failed to send CRLF to server");
+	}
+	while ((sz = recv(sfd, buf, sizeof(buf), 0))) {
 		if (fwrite(buf, 1, sz, stdout) != sz) {
 			err(1, "Failed to print response");
 		}
 	}
-	maybe(rrr_close(&ctx));
+}
+
+// Secure SSL request for open SFD and HOST.
+static void
+secure(int sfd, char *host)
+{
+	char buf[4096];
+	size_t sz;
+	SSL_CTX *ctx;
+	SSL *ssl;
+	assert(sfd);
+	assert(host);
+	if (!(ctx = SSL_CTX_new(TLS_client_method()))) {
+		errx(1, "Failed to create SSL context");
+	}
+	if (!(ssl = SSL_new(ctx))) {
+		errx(1, "Failed to create SSL instance");
+	}
+	if (!SSL_set_tlsext_host_name(ssl, host)) {
+		errx(1, "Failed to TLS set hostname");
+	}
+	if (!SSL_set_fd(ssl, sfd)) {
+		errx(1, "Failed to set SSL sfd");
+	}
+	if (SSL_connect(ssl) < 1) {
+		errx(1, "Failed to stablish SSL connection");
+	}
+	while ((sz = fread(buf, 1, sizeof(buf), stdin))) {
+		if (SSL_write(ssl, buf, sz) < 1) {
+			errx(1, "Failed to send secure request to server");
+		}
+	}
+	if (SSL_write(ssl, CRLF, sizeof(CRLF)) < 1) {
+		errx(1, "Failed to send secure CRLF to server");
+	}
+	while ((sz = SSL_read(ssl, buf, sizeof(buf)))) {
+		if (fwrite(buf, 1, sz, stdout) != sz) {
+			err(1, "Failed to print response");
+		}
+	}
+	SSL_CTX_free(ctx);
+	SSL_free(ssl);
+}
+
+static void
+run(char *host, int port, int ssl)
+{
+	int sfd;
+	assert(host);
+	assert(port > 0);
+	sfd = tcp(host, port);
+	if (ssl) {
+		secure(sfd, host);
+	} else {
+		plain(sfd);
+	}
+	if (close(sfd)) {
+		err(1, "Failed to close socker file descriptor");
+	}
 }
 
 int
