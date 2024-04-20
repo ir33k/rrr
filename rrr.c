@@ -1,18 +1,13 @@
 #include <assert.h>
-#include <netdb.h>
+#include <netdb.h>              // For sockaddr stuff
 #include <openssl/ssl.h>
-#include <stdio.h>
-#include <string.h>
-#include <unistd.h>
+#include <string.h>             // For memcpy()
+#include <unistd.h>             // For close()
 #include "rrr.h"
-
-// Carriage Return and Line Feed characters are send at the end of
-// each request message to indicated end of transmission to server.
-#define CRLF "\r\n"
 
 // Establish internet TCP socket stream connection to HOST on PORT.
 // When 0 is returned then SFD was set and connected successfully.
-static enum rrr
+static enum rrr_err
 tcp(char *host, int port, int *sfd)
 {
 	int i;
@@ -38,122 +33,99 @@ tcp(char *host, int port, int *sfd)
 	return RRR_CONNECT;
 }
 
-// Request content of FP to open SFD socket.
-// Write response to stdout.
-static enum rrr
-req_plain(int sfd, FILE *fp)
+enum rrr_err
+rrr_open(struct rrr *req, char *host, int port, int ssl)
 {
-	char buf[4096];
-	size_t sz;
-	assert(sfd);
-	assert(fp);
-	while ((sz = fread(buf, 1, sizeof(buf), fp))) {
-		if (send(sfd, buf, sz, 0) == -1) {
-			return RRR_REQ_SEND;
-		}
-	}
-	if (send(sfd, CRLF, sizeof(CRLF) -1, 0) == -1) {
-		return RRR_REQ_CRLF;
-	}
-	while ((sz = recv(sfd, buf, sizeof(buf), 0)) > 0) {
-		if (fwrite(buf, 1, sz, stdout) != sz) {
-			return RRR_PRINT;
-		}
-	}
-	return 0;
-}
-
-// Request secure content of FP to open SFD socket to HOST.
-// Write response to stdout.
-static enum rrr
-req_secure(int sfd, FILE *fp, char *host)
-{
-	char buf[4096];
-	size_t sz;
-	SSL *ssl;
+	enum rrr_err code;
 	SSL_CTX *ctx;
-	assert(sfd);
-	assert(fp);
+	assert(req);
 	assert(host);
+	assert(port > 0);
+	req->host = host;
+	if ((code = tcp(host, port, &req->sfd))) {
+		return code;
+	}
+	if (!ssl) {
+		req->ssl = 0;
+		return 0;
+	}
 	if (!(ctx = SSL_CTX_new(TLS_client_method()))) {
 		return RRR_SSL_CTX;
 	}
-	if (!(ssl = SSL_new(ctx))) {
+	if (!(req->ssl = SSL_new(ctx))) {
 		return RRR_SSL_NEW;
 	}
-	if (!SSL_set_tlsext_host_name(ssl, host)) {
+	if (!SSL_set_tlsext_host_name(req->ssl, host)) {
 		return RRR_SSL_HOST;
 	}
-	if (!SSL_set_fd(ssl, sfd)) {
+	if (!SSL_set_fd(req->ssl, req->sfd)) {
 		return RRR_SSL_FD;
 	}
-	if (SSL_connect(ssl) < 1) {
+	if (SSL_connect(req->ssl) < 1) {
 		return RRR_SSL_CONNECT;
 	}
-	while ((sz = fread(buf, 1, sizeof(buf), fp))) {
-		if (SSL_write(ssl, buf, sz) < 1) {
-			return RRR_SSL_WRITE;
-		}
-	}
-	if (SSL_write(ssl, CRLF, sizeof(CRLF) - 1) < 1) {
-		return RRR_SSL_CRLF;
-	}
-	while ((sz = SSL_read(ssl, buf, sizeof(buf))) > 0) {
-		if (fwrite(buf, 1, sz, stdout) != sz) {
-			return RRR_PRINT;
-		}
-	}
 	SSL_CTX_free(ctx);
-	SSL_free(ssl);
 	return 0;
 }
 
-enum rrr
-rrr_req(FILE *fp, char *host, int port, int secure)
+enum rrr_err
+rrr_req(struct rrr *req, char *buf, size_t sz)
 {
-	enum rrr code;
-	int sfd;
-	if (!port) {
-		return RRR_PORT;
-	}
-	if ((code = tcp(host, port, &sfd))) {
-		return code;
-	}
-	if (secure) {
-		if ((code = req_secure(sfd, fp, host))) {
-			return code;
+	assert(req);
+	assert(buf);
+	assert(sz > 0);
+	if (req->ssl) {
+		if (SSL_write(req->ssl, buf, sz) < 1) {
+			return RRR_SSL_WRITE;
 		}
 	} else {
-		if ((code = req_plain(sfd, fp))) {
-			return code;
+		if (send(req->sfd, buf, sz, 0) == -1) {
+			return RRR_SEND;
 		}
 	}
-	if (close(sfd)) {
+	return 0;
+}
+
+size_t
+rrr_res(struct rrr *req, char *buf, size_t sz)
+{
+	assert(req);
+	assert(buf);
+	assert(sz > 0);
+	if (req->ssl) {
+		return SSL_read(req->ssl, buf, sizeof(buf));
+	}
+	return recv(req->sfd, buf, sizeof(buf), 0);
+}
+
+enum rrr_err
+rrr_close(struct rrr *req)
+{
+	if (req->ssl) {
+		SSL_free(req->ssl);
+	}
+	if (close(req->sfd)) {
 		return RRR_CLOSE;
 	}
 	return 0;
 }
 
 char *
-rrr_err(enum rrr code)
+rrr_err(enum rrr_err code)
 {
 	switch (code) {
 	case RRR_OK:          return "Ok";
-	case RRR_PORT:        return "Missing port";
 	case RRR_HOST:        return "Failed to get hostname";
 	case RRR_CONNECT:     return "Failed to connect (invalid port?)";
-	case RRR_PRINT:       return "Failed to print response";
 	case RRR_OPEN:        return "Failed to open socket";
 	case RRR_CLOSE:       return "Failed to close sfd";
-	case RRR_REQ_SEND:    return "Failed to send request to server";
-	case RRR_REQ_CRLF:    return "Failed to send CRLF to server";
+	case RRR_SEND:        return "Failed to send request to server";
 	case RRR_SSL_CTX:     return "Failed to create SSL context";
 	case RRR_SSL_NEW:     return "Failed to create SSL instance";
 	case RRR_SSL_HOST:    return "Failed to TLS set hostname";
 	case RRR_SSL_FD:      return "Failed to set SSL sfd";
 	case RRR_SSL_CONNECT: return "Failed to stablish SSL connection";
 	case RRR_SSL_WRITE:   return "Failed to send secure request to server";
-	case RRR_SSL_CRLF:    return "Failed to send secure CRLF to server";
 	}
 	return "Unknown error";
 }
