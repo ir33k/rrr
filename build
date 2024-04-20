@@ -2,6 +2,6 @@
 set -ex # Stop on first error and log all commands
 
 CC="cc"
-CFLAGS="-std=c99 -Wall -Wextra -Wshadow -Wmissing-declarations -Wswitch-enum -Wno-deprecated-declarations -pedantic"
+CFLAGS="-std=c89 -Wall -Wextra -Wshadow -Wmissing-declarations -Wswitch-enum -Wno-deprecated-declarations -pedantic"
 
 $CC $CFLAGS -o rrr main.c -lssl -lcrypto

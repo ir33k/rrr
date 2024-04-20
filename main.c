@@ -1,4 +1,4 @@
-#define VERSION "v2.0"
+#define VERSION "v2.1"
 
 #include <assert.h>
 #include <err.h>
@@ -25,8 +25,8 @@ usage(char *arg0)
 	       , arg0);
 }
 
-// Establish internet TCP socket stream connection to HOST on PORT.
-// Return Socker File Descriptor on success, exit with 1 on error.
+/* Establish internet TCP socket stream connection to HOST on PORT.
+ * Return Socker File Descriptor on success, exit with 1 on error. */
 static int
 tcp(char *host, int port)
 {
@@ -48,12 +48,12 @@ tcp(char *host, int port)
 		if (connect(sfd, (struct sockaddr*)&addr, sizeof(addr))) {
 			continue;
 		}
-		return sfd;	// Success
+		return sfd;	/* Success */
 	}
 	errx(1, "Failed to connect (invalid port?)");
 }
 
-// Non secure plain request for open SFD.
+/* Non secure plain request for open SFD. */
 static void
 plain(int sfd)
 {
@@ -75,7 +75,7 @@ plain(int sfd)
 	}
 }
 
-// Secure SSL request for open SFD and HOST.
+/* Secure SSL request for open SFD and HOST. */
 static void
 secure(int sfd, char *host)
 {
@@ -110,7 +110,7 @@ secure(int sfd, char *host)
 	}
 	while ((sz = SSL_read(ssl, buf, sizeof(buf)))) {
 		if (fwrite(buf, 1, sz, stdout) != sz) {
-			err(1, "Failed to print response");
+			err(1, "Failed to print secure response");
 		}
 	}
 	SSL_CTX_free(ctx);
