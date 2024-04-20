@@ -1,4 +1,4 @@
-#define VERSION "v2.1"
+#define VERSION "v2.2"
 
 #include <assert.h>
 #include <err.h>
@@ -14,6 +14,7 @@
 static void
 usage(char *arg0)
 {
+	assert(arg0);
 	printf("usage: %s [-s] [-v] [-h] host port <req\n"
 	       "\n"
 	       "	host	Target server hostname.\n"
