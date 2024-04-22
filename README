@@ -12,12 +12,12 @@ Build and usage:
 Request root of Gopher hole:
 
 	$ echo "" | ./rrr tilde.pink 70
-	$ echo "" | ./rrr gopher.floodgap.com 70
+	$ echo "" | ./rrr floodgap.com 70
 
 Request path of Gopher hole:
 
 	$ echo "/~irek" | ./rrr tilde.pink 70
-	$ echo "/fun"   | ./rrr gopher.floodgap.com 70
+	$ echo "/fun"   | ./rrr floodgap.com 70
 
 Request file from Gopher hole:
 
@@ -27,15 +27,15 @@ Request file from Gopher hole:
 
 Request search result from Gopher hole:
 
-	$ echo "/v2/vs	vim"    | ./rrr gopher.floodgap.com 70
-	$ echo "/v2/vs	emacs"  | ./rrr gopher.floodgap.com 70
-	$ echo "/v2/vs	gemini" | ./rrr gopher.floodgap.com 70
+	$ echo "/v2/vs	vim"    | ./rrr floodgap.com 70
+	$ echo "/v2/vs	emacs"  | ./rrr floodgap.com 70
+	$ echo "/v2/vs	gemini" | ./rrr floodgap.com 70
 
 Request HTTP page:
 
-	$ echo "GET http://gabr.pl/ HTTP/1.0"      | ./rrr irek.gabr.pl 80
-	$ echo "GET http://arek.gabr.pl/ HTTP/1.0" | ./rrr irek.gabr.pl 80
-	$ echo "GET http://irek.gabr.pl/ HTTP/1.0" | ./rrr irek.gabr.pl 80
+	$ echo "GET http://gabr.pl/ HTTP/1.0"      | ./rrr gabr.pl 80
+	$ echo "GET http://arek.gabr.pl/ HTTP/1.0" | ./rrr gabr.pl 80
+	$ echo "GET http://irek.gabr.pl/ HTTP/1.0" | ./rrr gabr.pl 80
 
 Request HTTPS page:
 
